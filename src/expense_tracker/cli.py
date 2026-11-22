@@ -8,8 +8,13 @@ from .report import filter_month, grand_total, totals_by_category
 
 
 def cmd_add(args):
+    try:
+        expense = Expense.create(args.amount, args.category, args.description, args.date)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
     expenses = storage.load(args.file)
-    expenses.append(Expense(float(args.amount), args.category, args.description, args.date))
+    expenses.append(expense)
     storage.save(expenses, args.file)
     print("Added.")
 
