@@ -1,9 +1,8 @@
 import argparse
-import csv
-import json
 import sys
 
 from . import storage
+from .exporters import EXPORTERS
 from .models import Expense
 from .report import filter_month, grand_total, totals_by_category
 
@@ -31,30 +30,14 @@ def cmd_summary(args):
 
 
 def cmd_export(args):
-    expenses = storage.load(args.file)
-    if args.format == "csv":
-        with open(args.output, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["date", "category", "amount", "description"])
-            for e in expenses:
-                writer.writerow([e.date, e.category, e.amount, e.description])
-    elif args.format == "json":
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(
-                {"expenses": [e.to_dict() for e in expenses], "total": grand_total(expenses)},
-                f,
-                indent=2,
-            )
-    elif args.format == "md":
-        with open(args.output, "w", encoding="utf-8") as f:
-            f.write("| date | category | amount | description |\n")
-            f.write("|---|---|---|---|\n")
-            for e in expenses:
-                f.write(f"| {e.date} | {e.category} | {e.amount:.2f} | {e.description} |\n")
-            f.write(f"\n**Total:** {grand_total(expenses):.2f}\n")
-    else:
+    exporter = EXPORTERS.get(args.format)
+    if exporter is None:
         print("Unknown format: " + args.format)
         sys.exit(1)
+    expenses = storage.load(args.file)
+    # newline="" keeps the csv module's \r\n row endings byte-identical to the baseline
+    with open(args.output, "w", newline="", encoding="utf-8") as f:
+        f.write(exporter.render(expenses))
     print(f"Exported {len(expenses)} expenses to {args.output}")
 
 
