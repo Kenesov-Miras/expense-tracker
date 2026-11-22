@@ -1,0 +1,72 @@
+## P1 invalid input accepted (negative amount, impossible date)
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/e.json add -50 food refund --date 2026-11-05
+Added.
+[exit code: 0]
+
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/e.json add 10 food lunch --date 2026-13-45
+Added.
+[exit code: 0]
+
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/e.json list
+1. 2026-11-05 food             -50.00  refund
+2. 2026-13-45 food              10.00  lunch
+[exit code: 0]
+
+## P2 one bad date breaks month summary
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/e.json summary --month 2026-11
+  File "/usr/local/lib/python3.13/_strptime.py", line 555, in _strptime
+    raise ValueError("time data %r does not match format %r" %
+                     (data_string, format))
+ValueError: time data '2026-13-45' does not match format '%Y-%m-%d'
+[exit code: 1]
+
+## P3 non-numeric / non-finite amount
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/n.json add nan food x --date 2026-11-01
+Added.
+[exit code: 0]
+
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/n.json add inf food x --date 2026-11-01
+Added.
+[exit code: 0]
+
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/n.json summary
+food                nan
+TOTAL               nan
+[exit code: 0]
+
+## P4 CSV formula injection
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/c.json add 5 misc '=HYPERLINK("http://evil.example","click")' --date 2026-11-01
+Added.
+[exit code: 0]
+
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/c.json export csv /tmp/tmp.7O6GSNZ4HG/out.csv && cat /tmp/tmp.7O6GSNZ4HG/out.csv
+Exported 1 expenses to /tmp/tmp.7O6GSNZ4HG/out.csv
+date,category,amount,description
+2026-11-01,misc,5.0,"=HYPERLINK(""http://evil.example"",""click"")"
+[exit code: 0]
+
+## P5 corrupt data file
+$ printf '[{"amount": 1, ' > /tmp/tmp.7O6GSNZ4HG/bad.json; python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/bad.json list
+  File "/usr/local/lib/python3.13/json/decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 16 (char 15)
+[exit code: 1]
+
+## P6 float money accumulation
+$ python3 -c 'from expense_tracker.models import Expense as E; from expense_tracker.report import grand_total as g; print(repr(g([E(0.1,"a","","2026-11-01")]*3)))'
+0.30000000000000004
+[exit code: 0]
+
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/f.json add 0.1 a x --date 2026-11-01; python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/f.json add 0.2 a y --date 2026-11-01; python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/f.json export json /tmp/tmp.7O6GSNZ4HG/f_out.json; grep total /tmp/tmp.7O6GSNZ4HG/f_out.json
+Added.
+Added.
+Exported 2 expenses to /tmp/tmp.7O6GSNZ4HG/f_out.json
+  "total": 0.30000000000000004
+[exit code: 0]
+
+## P7 unknown export format
+$ python3 -c 'import sys; from expense_tracker.cli import main; main(sys.argv[1:])' --file /tmp/tmp.7O6GSNZ4HG/f.json export xml /tmp/tmp.7O6GSNZ4HG/x.xml
+Unknown format: xml
+[exit code: 1]
+

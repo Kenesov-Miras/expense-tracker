@@ -1,0 +1,68 @@
+# Check run: baseline — 2026-11-23T00:19:08+05:00 — commit 5f85206
+# Python 3.13.18, pytest 9.1.1, ruff 0.16.9, mypy 2.3.1 (compiled: yes)
+
+$ python3 -m pytest -q
+
+==================================== ERRORS ====================================
+_____________________ ERROR collecting tests/test_basic.py _____________________
+ImportError while importing test module '/home/claude/expense-tracker/tests/test_basic.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/local/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_basic.py:1: in <module>
+    from expense_tracker import storage
+E   ModuleNotFoundError: No module named 'expense_tracker'
+=========================== short test summary info ============================
+ERROR tests/test_basic.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.11s
+[exit code: 2]
+
+$ PYTHONPATH=src python3 -m pytest -q
+....                                                                     [100%]
+4 passed in 0.01s
+[exit code: 0]
+
+$ ruff check .
+I001 [*] Import block is un-sorted or un-formatted
+ --> src/expense_tracker/models.py:1:1
+  |
+1 | from dataclasses import dataclass, asdict
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Organize imports
+  |
+  - from dataclasses import dataclass, asdict
+1 + from dataclasses import asdict, dataclass
+2 |
+  |
+
+DTZ007 Naive datetime constructed using `datetime.datetime.strptime()` without %z
+  --> src/expense_tracker/report.py:8:13
+   |
+ 6 |     result = []
+ 7 |     for e in expenses:
+ 8 |         d = datetime.strptime(e.date, "%Y-%m-%d")
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |         if d.strftime("%Y-%m") == month:
+10 |             result.append(e)
+   |
+help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
+
+Found 2 errors.
+[*] 1 fixable with the `--fix` option.
+[exit code: 1]
+
+$ mypy src
+Success: no issues found in 5 source files
+[exit code: 0]
+
+$ PYTHONPATH=src python3 -m expense_tracker --help | head -3
+/usr/local/bin/python3: No module named expense_tracker.__main__; 'expense_tracker' is a package and cannot be directly executed
+[exit code: 0]
+
+$ pip wheel . --no-deps --no-build-isolation -q -w /tmp/dist_baseline && ls /tmp/dist_baseline
+expense_tracker-0.1.0-py3-none-any.whl
+[exit code: 0]
+
