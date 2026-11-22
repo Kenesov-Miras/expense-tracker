@@ -32,6 +32,14 @@ mypy src
 pip wheel . --no-deps --no-build-isolation -w /tmp/dist
 ```
 
+## Known limitations (v0.1.x)
+- **Back up `expenses.json` before upgrading or editing it by hand.** A corrupted or
+  hand-edited file stops the tool with a traceback, and saving is not atomic (risk R-03).
+- Records with invalid dates written by v0.1.0 can still break `summary --month`;
+  fix them by hand (new input is validated since M1).
+- Amounts are floats; totals are rounded to 2 decimals on screen, the JSON export may
+  show binary rounding noise such as `0.30000000000000004` (risk R-04).
+
 ## For AI agents
 Read [AGENTS.md](AGENTS.md) before changing anything. Acceptance criteria:
 [docs/ACCEPTANCE_CRITERIA.md](docs/ACCEPTANCE_CRITERIA.md).
