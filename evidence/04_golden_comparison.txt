@@ -1,0 +1,2 @@
+$ diff -r golden_baseline golden_final   # AC1–AC3: outputs of baseline (5f85206) vs final for the same valid dataset
+[exit code: 0]  (0 = byte-identical: data.json, list.txt, summary_nov.txt, summary_all.txt, out.csv, out.json, out.md)

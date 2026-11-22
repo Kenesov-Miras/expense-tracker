@@ -1,0 +1,3 @@
+$ python3 -m expense_tracker --file legacy.json summary --month 2026-11   # legacy file containing a bad date written by v0.1.0
+ValueError: time data '2026-13-45' does not match format '%Y-%m-%d'
+[exit code: 1]

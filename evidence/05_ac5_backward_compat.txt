@@ -1,0 +1,6 @@
+$ PYTHONPATH=src python3 -m expense_tracker --file <baseline data.json created by v0.1.0> list   # AC5
+1. 2026-11-01 food              10.00  lunch
+2. 2026-11-02 transport          5.50  bus
+3. 2026-10-30 food              20.00  dinner, with friends
+[exit code: 0]
+identical to baseline list.txt
