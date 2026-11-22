@@ -20,13 +20,23 @@ class Exporter(Protocol):
     def render(self, expenses: list[Expense]) -> str: ...
 
 
+# Cells starting with these characters are interpreted as formulas by
+# Excel / LibreOffice / Google Sheets (OWASP "CSV Injection").
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_cell(text: str) -> str:
+    """Neutralise spreadsheet formulas in user-controlled text (risk R-02)."""
+    return "'" + text if text.startswith(_FORMULA_PREFIXES) else text
+
+
 class CsvExporter:
     def render(self, expenses: list[Expense]) -> str:
         buf = io.StringIO()
         writer = csv.writer(buf)
         writer.writerow(["date", "category", "amount", "description"])
         for e in expenses:
-            writer.writerow([e.date, e.category, e.amount, e.description])
+            writer.writerow([e.date, _safe_cell(e.category), e.amount, _safe_cell(e.description)])
         return buf.getvalue()
 
 

@@ -1,0 +1,20 @@
+$ python3 -m pytest -q tests/test_mitigations.py   # BEFORE mitigation (commit fba7d24)
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[-50-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[0-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[nan-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[inf-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[abc-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[10-2026-13-45]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[10-2026-2-30]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[10-05.11.2026]
+FAILED tests/test_mitigations.py::test_add_rejects_empty_category
+FAILED tests/test_mitigations.py::test_valid_add_still_works_and_summary_survives
+FAILED tests/test_mitigations.py::test_expense_create_normalises_values
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[=1+2]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[+SUM(A1)]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[-2+3]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[@cmd]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[\t=1]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[\r=1]
+17 failed, 1 passed in 0.09s
+[exit code: 1]
