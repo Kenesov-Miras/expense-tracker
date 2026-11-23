@@ -5,7 +5,7 @@ subtitle: "AI-assisted repository customization, agent readiness and software ri
 
 **Student:** _Surname Name_ · **Date:** 23 November 2026 · **AI assistant:** Claude Opus 5.5 (Anthropic), Claude app
 
-**Repository:** `expense-tracker` (source export with full git history attached as `expense-tracker.zip`).
+**Repository:** `expense-tracker` (source code included in Appendix C: AGENTS.md, README and the full baseline → final diff; commit references below).
 A small, non-sensitive Python CLI that records personal expenses in a local JSON file.
 All data used is synthetic; the repository contains no credentials or personal data.
 
@@ -244,6 +244,877 @@ The repository instructions helped. With safe commands and forbidden actions wri
 | 2026-11-23 | same | Write failing regression tests, then minimal fixes for R-01 and R-02 | `test_mitigations.py`, M1, M2 | first validation accepted nan/inf; ISO date too permissive | `isfinite` and regex added | `evidence/03`, `06`, `07` |
 | 2026-11-23 | same | Readiness audit, background-agent design, release decision, report | this report | — | wording reviewed | evidence logs, git log |
 
-# Appendix B — Evidence files
+# Appendix B — Evidence files (key logs reproduced in Appendix D)
 
 `evidence/01_baseline_checks.txt` · `02_baseline_probes.txt` · `03_mitigation_tests_before.txt` · `04_golden_comparison.txt` · `05_ac5_backward_compat.txt` · `06_final_checks.txt` · `07_final_probes.txt` · `08_residual_legacy_bad_date.txt`. Reproduce: `git checkout baseline` / `git checkout final` and run the commands shown in each file.
+
+# Appendix C — Source code
+
+## C.1 AGENTS.md (final)
+
+```text
+# AGENTS.md — instructions for AI coding agents
+
+This file is the operating contract for any AI coding agent (Claude Code, Codex,
+Copilot agent, etc.) working in this repository. Humans should read it too.
+
+## 1. Purpose
+`expense-tracker` is a small offline command-line tool that records personal
+expenses in a local JSON file and prints listings, monthly summaries and exports
+(CSV / JSON / Markdown). It has no network access, no server and no database.
+
+## 2. Architecture (src layout)
+| Path | Responsibility |
+|---|---|
+| `src/expense_tracker/cli.py` | argparse entry point (`main`), one `cmd_*` function per sub-command. Only I/O and wiring — no business rules. |
+| `src/expense_tracker/__main__.py` | enables `python -m expense_tracker` |
+| `src/expense_tracker/models.py` | `Expense` dataclass, (de)serialisation, input validation |
+| `src/expense_tracker/storage.py` | load/save the JSON data file |
+| `src/expense_tracker/report.py` | pure functions: month filter, totals |
+| `src/expense_tracker/exporters.py` | export formats (Strategy registry `EXPORTERS`) — introduced in the Task 3 refactor |
+| `tests/` | pytest suite; every test must use `tmp_path`, never the real data file |
+
+Data file format (must stay backward compatible): a JSON list of
+`{"amount": number, "category": str, "description": str, "date": "YYYY-MM-DD"}`.
+
+## 3. Setup
+```
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+```
+Python >= 3.10. Do not change the supported Python range without approval.
+
+## 4. Safe commands (allowed without asking)
+```
+python3 -m pytest -q            # tests (pythonpath is configured in pyproject)
+ruff check .                    # lint (read-only; do NOT run with --fix on files you were not asked to touch)
+mypy src                        # type check
+python3 -m expense_tracker --file /tmp/<scratch>.json <command>   # manual check with a scratch file
+pip wheel . --no-deps --no-build-isolation -w /tmp/dist           # build check
+git status / git diff / git log # inspection
+```
+
+## 5. Coding conventions
+- Keep `cli.py` thin: parsing, printing, exit codes. Business rules live in `models.py` / `report.py`.
+- New export format = new class in `exporters.py` + one entry in `EXPORTERS`; never add `if/elif` chains on format names.
+- Validate user input at the boundary (`Expense.create`) and raise `ValueError` with a clear message; the CLI turns it into `error: ...` and exit code 2.
+- Type hints on all new functions; keep `mypy src` clean.
+- Standard library only at runtime. Small, focused commits with a message that says *why*.
+
+## 6. Test expectations
+- Every behaviour change or bug fix comes with a test that fails before and passes after.
+- Run `python3 -m pytest -q`, `ruff check .` and `mypy src` before declaring work done, and paste the actual output (pass/fail counts). Never claim a result you did not run.
+- Acceptance criteria AC1–AC5 (see `docs/ACCEPTANCE_CRITERIA.md`) must stay true.
+
+## 7. Forbidden actions (never do these)
+- Never read, create or commit secrets, tokens, `.env` files or real personal/financial data. Use only synthetic sample data.
+- Never deploy, publish to PyPI, push tags or push to `main`; work on a feature branch.
+- No destructive commands: `rm -rf` outside `/tmp`, `git push --force`, `git reset --hard`, history rewrites, deleting or overwriting a user's `expenses.json`.
+- No dependency changes (adding, removing, upgrading packages, editing `[project.dependencies]` or dev extras) without explicit human approval in the task.
+- Do not disable, skip or weaken tests, lint rules or type checks to make a check pass.
+- Do not access the network from code or tests.
+
+## 8. Review gates
+1. Agent produces: change summary, diff, test/lint/type/build output, and a note of risks or unverified assumptions.
+2. A human reviews the diff and the evidence and approves before merge.
+3. Changes to `storage.py` (data-loss risk), the data file format, or dependencies always need explicit human sign-off.
+
+## 9. When unsure
+Stop and ask instead of guessing. Prefer the smallest change that satisfies the task.
+```
+
+## C.2 README.md (final)
+
+```text
+# Expense Tracker
+
+A tiny offline command-line tool to record personal expenses and print summaries.
+Standard library only at runtime; data lives in a local JSON file.
+
+## Install
+
+```
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+## Usage
+
+```
+python3 -m expense_tracker add 12.50 food "Lunch" --date 2026-11-01
+python3 -m expense_tracker list
+python3 -m expense_tracker summary --month 2026-11
+python3 -m expense_tracker export csv out.csv      # formats: csv, json, md
+python3 -m expense_tracker --file other.json list  # use another data file
+```
+
+After `pip install -e .` the same commands are available as `expense-tracker ...`.
+Data is saved to `expenses.json` in the current folder unless `--file` is given.
+
+## Checks
+
+```
+python3 -m pytest -q
+ruff check .
+mypy src
+pip wheel . --no-deps --no-build-isolation -w /tmp/dist
+```
+
+## Known limitations (v0.1.x)
+- **Back up `expenses.json` before upgrading or editing it by hand.** A corrupted or
+  hand-edited file stops the tool with a traceback, and saving is not atomic (risk R-03).
+- Records with invalid dates written by v0.1.0 can still break `summary --month`;
+  fix them by hand (new input is validated since M1).
+- Amounts are floats; totals are rounded to 2 decimals on screen, the JSON export may
+  show binary rounding noise such as `0.30000000000000004` (risk R-04).
+
+## For AI agents
+Read [AGENTS.md](AGENTS.md) before changing anything. Acceptance criteria:
+[docs/ACCEPTANCE_CRITERIA.md](docs/ACCEPTANCE_CRITERIA.md).
+```
+
+## C.3 Acceptance criteria file
+
+```text
+# Acceptance criteria (must remain true after every change)
+
+| ID | Criterion | How it is verified |
+|---|---|---|
+| AC1 | `add` then `list` preserves every field (amount, category, description, date) of a valid expense. | `tests/test_basic.py::test_save_and_load_roundtrip`, golden `list.txt` comparison |
+| AC2 | `summary` (with and without `--month`) prints correct per-category totals and grand total for valid data. | `test_totals_by_category`, `test_filter_month`, `test_grand_total`, golden `summary_*.txt` |
+| AC3 | `export csv|json|md` output for valid data is byte-identical to the baseline version. | golden comparison of `out.csv`, `out.json`, `out.md` (`diff -r`) + `tests/test_exporters.py` |
+| AC4 | The full suite passes from a clean checkout with the documented command `python3 -m pytest -q`. | check log in `evidence/` |
+| AC5 | A data file written by the baseline version (v0.1.0) loads unchanged in the new version. | golden `data.json` from baseline is reused by the final run |
+```
+
+## C.4 Baseline source (tag `baseline`, 5f85206)
+
+**pyproject.toml**
+
+```python
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "expense-tracker"
+version = "0.1.0"
+description = "Small command-line expense tracker that stores data in a local JSON file"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+
+[project.scripts]
+expense-tracker = "expense_tracker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+```
+
+**src/expense_tracker/models.py**
+
+```python
+from dataclasses import dataclass, asdict
+
+
+@dataclass
+class Expense:
+    amount: float
+    category: str
+    description: str
+    date: str  # YYYY-MM-DD
+
+    def to_dict(self):
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(data):
+        return Expense(
+            amount=float(data["amount"]),
+            category=data["category"],
+            description=data.get("description", ""),
+            date=data["date"],
+        )
+```
+
+**src/expense_tracker/storage.py**
+
+```python
+import json
+import os
+
+from .models import Expense
+
+DEFAULT_FILE = "expenses.json"
+
+
+def load(path=DEFAULT_FILE):
+    if not os.path.exists(path):
+        return []
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return [Expense.from_dict(item) for item in data]
+
+
+def save(expenses, path=DEFAULT_FILE):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump([e.to_dict() for e in expenses], f, indent=2)
+```
+
+**src/expense_tracker/report.py**
+
+```python
+from datetime import datetime
+
+
+def filter_month(expenses, month):
+    """Return expenses whose date falls in month (YYYY-MM)."""
+    result = []
+    for e in expenses:
+        d = datetime.strptime(e.date, "%Y-%m-%d")
+        if d.strftime("%Y-%m") == month:
+            result.append(e)
+    return result
+
+
+def totals_by_category(expenses):
+    totals = {}
+    for e in expenses:
+        totals[e.category] = totals.get(e.category, 0) + e.amount
+    return totals
+
+
+def grand_total(expenses):
+    total = 0
+    for e in expenses:
+        total += e.amount
+    return total
+```
+
+**src/expense_tracker/cli.py**
+
+```python
+import argparse
+import csv
+import json
+import sys
+
+from . import storage
+from .models import Expense
+from .report import filter_month, grand_total, totals_by_category
+
+
+def cmd_add(args):
+    expenses = storage.load(args.file)
+    expenses.append(Expense(float(args.amount), args.category, args.description, args.date))
+    storage.save(expenses, args.file)
+    print("Added.")
+
+
+def cmd_list(args):
+    expenses = storage.load(args.file)
+    for i, e in enumerate(expenses, 1):
+        print(f"{i}. {e.date} {e.category:<12} {e.amount:>10.2f}  {e.description}")
+
+
+def cmd_summary(args):
+    expenses = storage.load(args.file)
+    if args.month:
+        expenses = filter_month(expenses, args.month)
+    for cat, total in sorted(totals_by_category(expenses).items()):
+        print(f"{cat:<12} {total:>10.2f}")
+    print(f"{'TOTAL':<12} {grand_total(expenses):>10.2f}")
+
+
+def cmd_export(args):
+    expenses = storage.load(args.file)
+    if args.format == "csv":
+        with open(args.output, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["date", "category", "amount", "description"])
+            for e in expenses:
+                writer.writerow([e.date, e.category, e.amount, e.description])
+    elif args.format == "json":
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(
+                {"expenses": [e.to_dict() for e in expenses], "total": grand_total(expenses)},
+                f,
+                indent=2,
+            )
+    elif args.format == "md":
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write("| date | category | amount | description |\n")
+            f.write("|---|---|---|---|\n")
+            for e in expenses:
+                f.write(f"| {e.date} | {e.category} | {e.amount:.2f} | {e.description} |\n")
+            f.write(f"\n**Total:** {grand_total(expenses):.2f}\n")
+    else:
+        print("Unknown format: " + args.format)
+        sys.exit(1)
+    print(f"Exported {len(expenses)} expenses to {args.output}")
+
+
+def build_parser():
+    p = argparse.ArgumentParser(prog="expense-tracker")
+    p.add_argument("--file", default=storage.DEFAULT_FILE)
+    sub = p.add_subparsers(dest="command", required=True)
+
+    a = sub.add_parser("add")
+    a.add_argument("amount")
+    a.add_argument("category")
+    a.add_argument("description", nargs="?", default="")
+    a.add_argument("--date", required=True)
+    a.set_defaults(func=cmd_add)
+
+    sub.add_parser("list").set_defaults(func=cmd_list)
+
+    s = sub.add_parser("summary")
+    s.add_argument("--month")
+    s.set_defaults(func=cmd_summary)
+
+    x = sub.add_parser("export")
+    x.add_argument("format")
+    x.add_argument("output")
+    x.set_defaults(func=cmd_export)
+    return p
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+**tests/test_basic.py**
+
+```python
+from expense_tracker import storage
+from expense_tracker.models import Expense
+from expense_tracker.report import filter_month, grand_total, totals_by_category
+
+
+def sample():
+    return [
+        Expense(10.0, "food", "lunch", "2026-11-01"),
+        Expense(5.5, "transport", "bus", "2026-11-02"),
+        Expense(20.0, "food", "dinner", "2026-10-30"),
+    ]
+
+
+def test_totals_by_category():
+    assert totals_by_category(sample()) == {"food": 30.0, "transport": 5.5}
+
+
+def test_filter_month():
+    assert len(filter_month(sample(), "2026-11")) == 2
+
+
+def test_grand_total():
+    assert grand_total(sample()) == 35.5
+
+
+def test_save_and_load_roundtrip(tmp_path):
+    path = tmp_path / "data.json"
+    storage.save(sample(), path)
+    assert storage.load(path) == sample()
+```
+
+## C.5 Changes baseline → final (`git diff baseline final -- pyproject.toml src tests`)
+
+```diff
+diff --git a/pyproject.toml b/pyproject.toml
+index 3ca39cf..d97474c 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -17,3 +17,17 @@ expense-tracker = "expense_tracker.cli:main"
+ 
+ [tool.setuptools.packages.find]
+ where = ["src"]
++
++[tool.pytest.ini_options]
++pythonpath = ["src"]
++testpaths = ["tests"]
++
++[tool.ruff]
++target-version = "py310"
++line-length = 100
++
++[tool.ruff.lint]
++select = ["E", "F", "W", "I", "B"]
++
++[tool.mypy]
++python_version = "3.10"
+diff --git a/src/expense_tracker/__main__.py b/src/expense_tracker/__main__.py
+new file mode 100644
+index 0000000..4e28416
+--- /dev/null
++++ b/src/expense_tracker/__main__.py
+@@ -0,0 +1,3 @@
++from .cli import main
++
++main()
+diff --git a/src/expense_tracker/cli.py b/src/expense_tracker/cli.py
+index e4e1b10..5e06b52 100644
+--- a/src/expense_tracker/cli.py
++++ b/src/expense_tracker/cli.py
+@@ -1,16 +1,20 @@
+ import argparse
+-import csv
+-import json
+ import sys
+ 
+ from . import storage
++from .exporters import EXPORTERS
+ from .models import Expense
+ from .report import filter_month, grand_total, totals_by_category
+ 
+ 
+ def cmd_add(args):
++    try:
++        expense = Expense.create(args.amount, args.category, args.description, args.date)
++    except ValueError as exc:
++        print(f"error: {exc}", file=sys.stderr)
++        sys.exit(2)
+     expenses = storage.load(args.file)
+-    expenses.append(Expense(float(args.amount), args.category, args.description, args.date))
++    expenses.append(expense)
+     storage.save(expenses, args.file)
+     print("Added.")
+ 
+@@ -31,30 +35,14 @@ def cmd_summary(args):
+ 
+ 
+ def cmd_export(args):
+-    expenses = storage.load(args.file)
+-    if args.format == "csv":
+-        with open(args.output, "w", newline="", encoding="utf-8") as f:
+-            writer = csv.writer(f)
+-            writer.writerow(["date", "category", "amount", "description"])
+-            for e in expenses:
+-                writer.writerow([e.date, e.category, e.amount, e.description])
+-    elif args.format == "json":
+-        with open(args.output, "w", encoding="utf-8") as f:
+-            json.dump(
+-                {"expenses": [e.to_dict() for e in expenses], "total": grand_total(expenses)},
+-                f,
+-                indent=2,
+-            )
+-    elif args.format == "md":
+-        with open(args.output, "w", encoding="utf-8") as f:
+-            f.write("| date | category | amount | description |\n")
+-            f.write("|---|---|---|---|\n")
+-            for e in expenses:
+-                f.write(f"| {e.date} | {e.category} | {e.amount:.2f} | {e.description} |\n")
+-            f.write(f"\n**Total:** {grand_total(expenses):.2f}\n")
+-    else:
++    exporter = EXPORTERS.get(args.format)
++    if exporter is None:
+         print("Unknown format: " + args.format)
+         sys.exit(1)
++    expenses = storage.load(args.file)
++    # newline="" keeps the csv module's \r\n row endings byte-identical to the baseline
++    with open(args.output, "w", newline="", encoding="utf-8") as f:
++        f.write(exporter.render(expenses))
+     print(f"Exported {len(expenses)} expenses to {args.output}")
+ 
+ 
+diff --git a/src/expense_tracker/exporters.py b/src/expense_tracker/exporters.py
+new file mode 100644
+index 0000000..125c271
+--- /dev/null
++++ b/src/expense_tracker/exporters.py
+@@ -0,0 +1,61 @@
++"""Export formats (Strategy pattern).
++
++Each exporter turns a list of expenses into the text of one output file.
++Exporters are pure (no file I/O), so they can be unit-tested directly;
++the CLI only picks a strategy from ``EXPORTERS`` and writes the result.
++"""
++
++from __future__ import annotations
++
++import csv
++import io
++import json
++from typing import Protocol
++
++from .models import Expense
++from .report import grand_total
++
++
++class Exporter(Protocol):
++    def render(self, expenses: list[Expense]) -> str: ...
++
++
++# Cells starting with these characters are interpreted as formulas by
++# Excel / LibreOffice / Google Sheets (OWASP "CSV Injection").
++_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
++
++
++def _safe_cell(text: str) -> str:
++    """Neutralise spreadsheet formulas in user-controlled text (risk R-02)."""
++    return "'" + text if text.startswith(_FORMULA_PREFIXES) else text
++
++
++class CsvExporter:
++    def render(self, expenses: list[Expense]) -> str:
++        buf = io.StringIO()
++        writer = csv.writer(buf)
++        writer.writerow(["date", "category", "amount", "description"])
++        for e in expenses:
++            writer.writerow([e.date, _safe_cell(e.category), e.amount, _safe_cell(e.description)])
++        return buf.getvalue()
++
++
++class JsonExporter:
++    def render(self, expenses: list[Expense]) -> str:
++        payload = {"expenses": [e.to_dict() for e in expenses], "total": grand_total(expenses)}
++        return json.dumps(payload, indent=2)
++
++
++class MarkdownExporter:
++    def render(self, expenses: list[Expense]) -> str:
++        lines = ["| date | category | amount | description |", "|---|---|---|---|"]
++        for e in expenses:
++            lines.append(f"| {e.date} | {e.category} | {e.amount:.2f} | {e.description} |")
++        return "\n".join(lines) + f"\n\n**Total:** {grand_total(expenses):.2f}\n"
++
++
++EXPORTERS: dict[str, Exporter] = {
++    "csv": CsvExporter(),
++    "json": JsonExporter(),
++    "md": MarkdownExporter(),
++}
+diff --git a/src/expense_tracker/models.py b/src/expense_tracker/models.py
+index beff372..b6c0b95 100644
+--- a/src/expense_tracker/models.py
++++ b/src/expense_tracker/models.py
+@@ -1,4 +1,9 @@
+-from dataclasses import dataclass, asdict
++import math
++import re
++from dataclasses import asdict, dataclass
++from datetime import date as _date
++
++_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+ 
+ 
+ @dataclass
+@@ -19,3 +24,23 @@ class Expense:
+             description=data.get("description", ""),
+             date=data["date"],
+         )
++
++    @staticmethod
++    def create(amount: str, category: str, description: str, date: str) -> "Expense":
++        """Build an Expense from raw user input, rejecting invalid values (risk R-01)."""
++        try:
++            value = float(amount)
++        except ValueError:
++            raise ValueError(f"amount must be a number, got {amount!r}") from None
++        if not math.isfinite(value) or value <= 0:
++            raise ValueError(f"amount must be a positive finite number, got {amount!r}")
++        category = category.strip()
++        if not category:
++            raise ValueError("category must not be empty")
++        if not _DATE_RE.match(date):
++            raise ValueError(f"date must be YYYY-MM-DD, got {date!r}")
++        try:
++            _date.fromisoformat(date)
++        except ValueError:
++            raise ValueError(f"date is not a real calendar date: {date!r}") from None
++        return Expense(value, category, description, date)
+diff --git a/tests/test_exporters.py b/tests/test_exporters.py
+new file mode 100644
+index 0000000..a05381e
+--- /dev/null
++++ b/tests/test_exporters.py
+@@ -0,0 +1,38 @@
++import json
++
++import pytest
++
++from expense_tracker.cli import main
++from expense_tracker.exporters import EXPORTERS
++from expense_tracker.models import Expense
++
++
++def sample():
++    return [
++        Expense(10.0, "food", "lunch", "2026-11-01"),
++        Expense(5.5, "transport", "bus", "2026-11-02"),
++    ]
++
++
++def test_registry_has_all_formats():
++    assert set(EXPORTERS) == {"csv", "json", "md"}
++
++
++def test_csv_render():
++    out = EXPORTERS["csv"].render(sample())
++    assert out.splitlines()[0] == "date,category,amount,description"
++    assert out.splitlines()[1] == "2026-11-01,food,10.0,lunch"
++
++
++def test_json_render_total():
++    assert json.loads(EXPORTERS["json"].render(sample()))["total"] == 15.5
++
++
++def test_md_render_total():
++    assert EXPORTERS["md"].render(sample()).endswith("**Total:** 15.50\n")
++
++
++def test_unknown_format_exits_nonzero(tmp_path):
++    with pytest.raises(SystemExit) as exc:
++        main(["--file", str(tmp_path / "d.json"), "export", "xml", str(tmp_path / "x")])
++    assert exc.value.code == 1
+diff --git a/tests/test_mitigations.py b/tests/test_mitigations.py
+new file mode 100644
+index 0000000..2dced44
+--- /dev/null
++++ b/tests/test_mitigations.py
+@@ -0,0 +1,70 @@
++"""Regression tests for risk-register mitigations M1 (R-01) and M2 (R-02)."""
++
++import csv
++import io
++
++import pytest
++
++from expense_tracker import storage
++from expense_tracker.cli import main
++from expense_tracker.exporters import EXPORTERS
++from expense_tracker.models import Expense
++
++# ---------- M1 / R-01: input validation at the CLI boundary ----------
++
++BAD_INPUTS = [
++    ("-50", "2026-11-05"),     # negative amount
++    ("0", "2026-11-05"),       # zero amount
++    ("nan", "2026-11-05"),     # not a number
++    ("inf", "2026-11-05"),     # infinite
++    ("abc", "2026-11-05"),     # not numeric
++    ("10", "2026-13-45"),      # impossible date
++    ("10", "2026-2-30"),       # wrong format and impossible
++    ("10", "05.11.2026"),      # wrong format
++]
++
++
++@pytest.mark.parametrize("amount,date", BAD_INPUTS)
++def test_add_rejects_invalid_input_and_does_not_write(tmp_path, capsys, amount, date):
++    data = tmp_path / "e.json"
++    with pytest.raises(SystemExit) as exc:
++        main(["--file", str(data), "add", amount, "food", "x", "--date", date])
++    assert exc.value.code == 2
++    assert "error:" in capsys.readouterr().err
++    assert storage.load(data) == []          # nothing was persisted
++
++
++def test_add_rejects_empty_category(tmp_path):
++    with pytest.raises(SystemExit):
++        main(["--file", str(tmp_path / "e.json"), "add", "5", "  ", "x", "--date", "2026-11-01"])
++
++
++def test_valid_add_still_works_and_summary_survives(tmp_path, capsys):
++    data = str(tmp_path / "e.json")
++    main(["--file", data, "add", "12.50", "food", "lunch", "--date", "2026-11-01"])
++    with pytest.raises(SystemExit):  # a bad record must not break later summaries
++        main(["--file", data, "add", "10", "food", "x", "--date", "2026-13-45"])
++    main(["--file", data, "summary", "--month", "2026-11"])
++    out = capsys.readouterr().out
++    assert "TOTAL" in out and "12.50" in out
++
++
++def test_expense_create_normalises_values():
++    e = Expense.create(" 7.25 ", " food ", "taxi", "2026-11-03")
++    assert e == Expense(7.25, "food", "taxi", "2026-11-03")
++
++
++# ---------- M2 / R-02: CSV formula injection ----------
++
++@pytest.mark.parametrize("payload", ["=1+2", "+SUM(A1)", "-2+3", "@cmd", "\t=1", "\r=1"])
++def test_csv_neutralises_formula_prefixes(payload):
++    out = EXPORTERS["csv"].render([Expense(5.0, payload, payload, "2026-11-01")])
++    row = list(csv.reader(io.StringIO(out)))[1]
++    assert row[1] == "'" + payload       # category
++    assert row[3] == "'" + payload       # description
++
++
++def test_csv_leaves_normal_text_untouched():
++    out = EXPORTERS["csv"].render([Expense(5.0, "food", "dinner, with friends", "2026-11-01")])
++    row = list(csv.reader(io.StringIO(out)))[1]
++    assert row == ["2026-11-01", "food", "5.0", "dinner, with friends"]
+```
+
+# Appendix D — Check logs (verbatim)
+
+**evidence/01_baseline_checks.txt**
+
+```text
+# Check run: baseline — 2026-11-23T00:19:08+05:00 — commit 5f85206
+# Python 3.13.18, pytest 9.1.1, ruff 0.16.9, mypy 2.3.1 (compiled: yes)
+
+$ python3 -m pytest -q
+
+==================================== ERRORS ====================================
+_____________________ ERROR collecting tests/test_basic.py _____________________
+ImportError while importing test module '/home/claude/expense-tracker/tests/test_basic.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/local/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_basic.py:1: in <module>
+    from expense_tracker import storage
+E   ModuleNotFoundError: No module named 'expense_tracker'
+=========================== short test summary info ============================
+ERROR tests/test_basic.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.11s
+[exit code: 2]
+
+$ PYTHONPATH=src python3 -m pytest -q
+....                                                                     [100%]
+4 passed in 0.01s
+[exit code: 0]
+
+$ ruff check .
+I001 [*] Import block is un-sorted or un-formatted
+ --> src/expense_tracker/models.py:1:1
+  |
+1 | from dataclasses import dataclass, asdict
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Organize imports
+  |
+  - from dataclasses import dataclass, asdict
+1 + from dataclasses import asdict, dataclass
+2 |
+  |
+
+DTZ007 Naive datetime constructed using `datetime.datetime.strptime()` without %z
+  --> src/expense_tracker/report.py:8:13
+   |
+ 6 |     result = []
+ 7 |     for e in expenses:
+ 8 |         d = datetime.strptime(e.date, "%Y-%m-%d")
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |         if d.strftime("%Y-%m") == month:
+10 |             result.append(e)
+   |
+help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
+
+Found 2 errors.
+[*] 1 fixable with the `--fix` option.
+[exit code: 1]
+
+$ mypy src
+Success: no issues found in 5 source files
+[exit code: 0]
+
+$ PYTHONPATH=src python3 -m expense_tracker --help | head -3
+/usr/local/bin/python3: No module named expense_tracker.__main__; 'expense_tracker' is a package and cannot be directly executed
+[exit code: 0]
+
+$ pip wheel . --no-deps --no-build-isolation -q -w /tmp/dist_baseline && ls /tmp/dist_baseline
+expense_tracker-0.1.0-py3-none-any.whl
+[exit code: 0]
+
+```
+
+**evidence/03_mitigation_tests_before.txt**
+
+```text
+$ python3 -m pytest -q tests/test_mitigations.py   # BEFORE mitigation (commit fba7d24)
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[-50-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[0-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[nan-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[inf-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[abc-2026-11-05]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[10-2026-13-45]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[10-2026-2-30]
+FAILED tests/test_mitigations.py::test_add_rejects_invalid_input_and_does_not_write[10-05.11.2026]
+FAILED tests/test_mitigations.py::test_add_rejects_empty_category
+FAILED tests/test_mitigations.py::test_valid_add_still_works_and_summary_survives
+FAILED tests/test_mitigations.py::test_expense_create_normalises_values
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[=1+2]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[+SUM(A1)]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[-2+3]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[@cmd]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[\t=1]
+FAILED tests/test_mitigations.py::test_csv_neutralises_formula_prefixes[\r=1]
+17 failed, 1 passed in 0.09s
+[exit code: 1]
+```
+
+**evidence/06_final_checks.txt**
+
+```text
+# Check run: final — 2026-11-23T00:22:38+05:00 — commit 3a7a43d
+# Python 3.13.18, pytest 9.1.1, ruff 0.16.9, mypy 2.3.1 (compiled: yes)
+
+$ python3 -m pytest -q
+...........................                                              [100%]
+27 passed in 0.06s
+[exit code: 0]
+
+$ PYTHONPATH=src python3 -m pytest -q
+...........................                                              [100%]
+27 passed in 0.05s
+[exit code: 0]
+
+$ ruff check .
+All checks passed!
+[exit code: 0]
+
+$ mypy src
+Success: no issues found in 7 source files
+[exit code: 0]
+
+$ PYTHONPATH=src python3 -m expense_tracker --help
+usage: expense-tracker [-h] [--file FILE] {add,list,summary,export} ...
+
+positional arguments:
+  {add,list,summary,export}
+
+options:
+  -h, --help            show this help message and exit
+  --file FILE
+[exit code: 0]
+
+$ pip wheel . --no-deps --no-build-isolation -q -w /tmp/dist_final && ls /tmp/dist_final
+expense_tracker-0.1.0-py3-none-any.whl
+[exit code: 0]
+
+```
+
+**evidence/04_golden_comparison.txt**
+
+```text
+$ diff -r golden_baseline golden_final   # AC1–AC3: outputs of baseline (5f85206) vs final for the same valid dataset
+[exit code: 0]  (0 = byte-identical: data.json, list.txt, summary_nov.txt, summary_all.txt, out.csv, out.json, out.md)
+```
+
+**evidence/05_ac5_backward_compat.txt**
+
+```text
+$ PYTHONPATH=src python3 -m expense_tracker --file <baseline data.json created by v0.1.0> list   # AC5
+1. 2026-11-01 food              10.00  lunch
+2. 2026-11-02 transport          5.50  bus
+3. 2026-10-30 food              20.00  dinner, with friends
+[exit code: 0]
+identical to baseline list.txt
+```
+
+**evidence/08_residual_legacy_bad_date.txt**
+
+```text
+$ python3 -m expense_tracker --file legacy.json summary --month 2026-11   # legacy file containing a bad date written by v0.1.0
+ValueError: time data '2026-13-45' does not match format '%Y-%m-%d'
+[exit code: 1]
+```
+
